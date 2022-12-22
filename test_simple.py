@@ -14,6 +14,7 @@ import numpy as np
 import PIL.Image as pil
 import matplotlib as mpl
 import matplotlib.cm as cm
+from tqdm import tqdm
 
 import torch
 from torchvision import transforms, datasets
@@ -41,7 +42,10 @@ def parse_args():
                             "mono+stereo_no_pt_640x192",
                             "mono_1024x320",
                             "stereo_1024x320",
-                            "mono+stereo_1024x320"])
+                            "mono+stereo_1024x320", "tmp/mono_stereo_model/models/weights_11"])
+
+    parser.add_argument('--output_dir', type=str, help='path to output folder of depth images', default='image_result')
+
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="jpg")
     parser.add_argument("--no_cuda",
@@ -69,9 +73,21 @@ def test_simple(args):
     if args.pred_metric_depth and "stereo" not in args.model_name:
         print("Warning: The --pred_metric_depth flag only makes sense for stereo-trained KITTI "
               "models. For mono-trained models, output depths will not in metric space.")
+    if args.model_name in [
+                            "mono_640x192",
+                            "stereo_640x192",
+                            "mono+stereo_640x192",
+                            "mono_no_pt_640x192",
+                            "stereo_no_pt_640x192",
+                            "mono+stereo_no_pt_640x192",
+                            "mono_1024x320",
+                            "stereo_1024x320",
+                            "mono+stereo_1024x320"]:
 
-    download_model_if_doesnt_exist(args.model_name)
-    model_path = os.path.join("models", args.model_name)
+        download_model_if_doesnt_exist(args.model_name)
+        model_path = os.path.join("models", args.model_name)
+    else:
+        model_path = args.model_name
     print("-> Loading model from ", model_path)
     encoder_path = os.path.join(model_path, "encoder.pth")
     depth_decoder_path = os.path.join(model_path, "depth.pth")
@@ -103,13 +119,16 @@ def test_simple(args):
     if os.path.isfile(args.image_path):
         # Only testing on a single image
         paths = [args.image_path]
-        output_directory = os.path.dirname(args.image_path)
+        output_directory = args.output_dir
     elif os.path.isdir(args.image_path):
         # Searching folder for images
         paths = glob.glob(os.path.join(args.image_path, '*.{}'.format(args.ext)))
-        output_directory = args.image_path
+        output_directory = args.output_dir
     else:
         raise Exception("Can not find args.image_path: {}".format(args.image_path))
+
+    if not os.path.exists(output_directory):
+        os.mkdir(output_directory)
 
     print("-> Predicting on {:d} test images".format(len(paths)))
 
